@@ -7,7 +7,14 @@ authors = [
     { name = "kraigochieng", email = "kraigochieng@gmail.com" }
 ]
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "elevenlabs>=2.65.0",
+    "fastapi>=0.141.1",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "pydub>=0.25.1",
+    "python-dotenv>=1.2.3",
+]
 
 [project.scripts]
 elevenlabs-tts-chunker = "elevenlabs_tts_chunker:main"

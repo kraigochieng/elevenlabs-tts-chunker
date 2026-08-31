@@ -2,10 +2,10 @@
 Pydantic schemas for elevenlabs-tts-chunker.
 """
 
+import itertools
 from enum import Enum
 
 from pydantic import BaseModel, Field, field_validator
-import itertools
 
 # ── ElevenLabs-native shapes (mirrors their documented API) ────────────
 
@@ -60,6 +60,7 @@ class WrapperTTSRequest(BaseModel):
 
     text: str
     model_id: str = "eleven_multilingual_v2"
+    language_code: str | None = None
     chunk_indexes: list[ChunkIndex] | None = None
     voice_settings: VoiceSettings | None = None
     output_format: OutputFormat = OutputFormat.mp3_44100_128

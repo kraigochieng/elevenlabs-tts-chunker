@@ -6,7 +6,11 @@ classes (rather than hardcoding a second copy) so this can't silently
 drift out of sync with the real request contract.
 """
 
-from elevenlabs_tts_chunker.schemas import OutputFormat, TextNormalization, WrapperTTSRequest
+from elevenlabs_tts_chunker.schemas import (
+    OutputFormat,
+    TextNormalization,
+    WrapperTTSRequest,
+)
 from elevenlabs_tts_chunker.services.tts import MAX_STITCHING_REQUEST_IDS
 from elevenlabs_tts_chunker.settings import Settings
 

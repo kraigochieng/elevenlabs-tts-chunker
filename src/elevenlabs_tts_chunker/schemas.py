@@ -5,6 +5,7 @@ Pydantic schemas for elevenlabs-tts-chunker.
 from enum import Enum
 
 from pydantic import BaseModel, Field, field_validator
+import itertools
 
 # ── ElevenLabs-native shapes (mirrors their documented API) ────────────
 
@@ -77,7 +78,7 @@ class WrapperTTSRequest(BaseModel):
                 raise ValueError(f"chunk end {c.end} exceeds text length {len(text)}")
 
         sorted_chunks = sorted(v, key=lambda c: c.start)
-        for prev, curr in zip(sorted_chunks, sorted_chunks[1:]):
+        for prev, curr in itertools.pairwise(sorted_chunks):
             if curr.start < prev.end:
                 raise ValueError(
                     f"chunk_indexes overlap: [{prev.start}, {prev.end}) and "

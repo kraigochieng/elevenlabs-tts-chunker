@@ -42,7 +42,7 @@ async def text_to_speech(voice_id: str, req: WrapperTTSRequest):
         bool(req.chunk_indexes),
     )
 
-    chunks = resolve_chunks(text, req.chunk_indexes)
+    chunks = resolve_chunks(text=text, chunk_indexes=req.chunk_indexes)
 
     voice_settings = (
         req.voice_settings.model_dump(exclude_none=True) if req.voice_settings else {}
@@ -55,25 +55,28 @@ async def text_to_speech(voice_id: str, req: WrapperTTSRequest):
     for i, c in enumerate(chunks):
         segment_text = text[c.start : c.end]
         audio_bytes = await synthesize_chunk(
-            client,
-            segment_text,
-            voice_id,
-            req.model_id,
-            voice_settings,
-            req.output_format.value,
-            req.apply_text_normalization.value,
+            client=client,
+            text=segment_text,
+            voice_id=voice_id,
+            model_id=req.model_id,
+            voice_settings=voice_settings,
+            output_format=req.output_format.value,
+            apply_text_normalization=req.apply_text_normalization.value,
             chunk_number=i + 1,
             total_chunks=len(chunks),
         )
         audio_chunks.append(audio_bytes)
 
-    out_buffer = merge_audio_chunks(audio_chunks, req.silence_between_chunks_ms)
+    out_buffer = merge_audio_chunks(
+        audio_chunks=audio_chunks,
+        silence_between_chunks_ms=req.silence_between_chunks_ms,
+    )
 
     total_elapsed = time.perf_counter() - request_start
     logger.info("Total request time=%.2fs", total_elapsed)
 
     return StreamingResponse(
-        out_buffer,
+        content=out_buffer,
         media_type="audio/mpeg",
         headers={
             "Content-Disposition": f'attachment; filename="{voice_id}_merged.mp3"'

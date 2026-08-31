@@ -64,9 +64,9 @@ def resolve_chunks(
     """Returns caller-supplied chunk_indexes if given, otherwise computes and
     logs the default chunk plan."""
     if chunk_indexes:
-        log_chunk_plan(chunk_indexes, text, source="caller-supplied")
+        log_chunk_plan(chunks=chunk_indexes, text=text, source="caller-supplied")
         return chunk_indexes
 
-    chunks = default_chunk_indexes(text)
-    log_chunk_plan(chunks, text, source="auto-computed")
+    chunks = default_chunk_indexes(text=text)
+    log_chunk_plan(chunks=chunks, text=text, source="auto-computed")
     return chunks

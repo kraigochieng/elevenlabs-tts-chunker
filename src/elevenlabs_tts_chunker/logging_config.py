@@ -17,7 +17,7 @@ def configure_logging() -> logging.Logger:
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    logger = logging.getLogger("tts_chunker")
+    logger = logging.getLogger(name="tts_chunker")
     logger.setLevel(level)
     return logger
 

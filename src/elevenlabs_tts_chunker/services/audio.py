@@ -29,7 +29,9 @@ def merge_audio_chunks(
         )
 
     for i, audio_bytes in enumerate(audio_chunks):
-        segment = AudioSegment.from_file(io.BytesIO(audio_bytes), format="mp3")
+        segment = AudioSegment.from_file(
+            file=io.BytesIO(initial_bytes=audio_bytes), format="mp3"
+        )
         combined += segment
         if silence is not None and i < len(audio_chunks) - 1:
             combined += silence
@@ -42,7 +44,7 @@ def merge_audio_chunks(
 
     merge_start = time.perf_counter()
     out_buffer = io.BytesIO()
-    combined.export(out_buffer, format="mp3")
+    combined.export(out_f=out_buffer, format="mp3")
     out_buffer.seek(0)
     merge_elapsed = time.perf_counter() - merge_start
 

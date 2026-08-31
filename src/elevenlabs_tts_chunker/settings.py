@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     # margins.
     default_max_chunk_chars: int = 9500
 
+    # Standard library logging level: DEBUG, INFO, WARNING, or ERROR.
+    log_level: str = "INFO"
+
     model_config = SettingsConfigDict(
         env_file=find_dotenv() or None,
         env_file_encoding="utf-8",

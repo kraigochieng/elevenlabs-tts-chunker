@@ -9,14 +9,20 @@ to the business logic in services/.
 """
 
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 
+from elevenlabs_tts_chunker.docs import render_api_docs
 from elevenlabs_tts_chunker.logging_config import logger
 from elevenlabs_tts_chunker.schemas import WrapperTTSRequest
 from elevenlabs_tts_chunker.services.orchestrator import synthesize_speech
 from elevenlabs_tts_chunker.settings import get_settings
 
 app = FastAPI(title="elevenlabs-tts-chunker")
+
+
+@app.get("/", response_class=PlainTextResponse)
+async def root() -> str:
+    return render_api_docs()
 
 
 @app.post("/v1/text-to-speech/{voice_id}")

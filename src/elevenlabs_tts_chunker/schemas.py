@@ -67,12 +67,21 @@ class WrapperTTSRequest(BaseModel):
 
     @field_validator("chunk_indexes")
     @classmethod
-    def validate_chunk_bounds(cls, v, info):
+    def validate_chunk_indexes(cls, v, info):
         text = info.data.get("text", "")
-        if v:
-            for c in v:
-                if c.end > len(text):
-                    raise ValueError(
-                        f"chunk end {c.end} exceeds text length {len(text)}"
-                    )
+        if not v:
+            return v
+
+        for c in v:
+            if c.end > len(text):
+                raise ValueError(f"chunk end {c.end} exceeds text length {len(text)}")
+
+        sorted_chunks = sorted(v, key=lambda c: c.start)
+        for prev, curr in zip(sorted_chunks, sorted_chunks[1:]):
+            if curr.start < prev.end:
+                raise ValueError(
+                    f"chunk_indexes overlap: [{prev.start}, {prev.end}) and "
+                    f"[{curr.start}, {curr.end})"
+                )
+
         return v

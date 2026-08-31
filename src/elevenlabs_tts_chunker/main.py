@@ -28,6 +28,10 @@ async def text_to_speech(voice_id: str, req: WrapperTTSRequest):
     request_start = time.perf_counter()
     text = req.text
 
+    if not text.strip():
+        logger.warning("Rejected request: text was empty")
+        raise HTTPException(status_code=422, detail="text must not be empty")
+
     logger.info(
         "Incoming TTS request | voice_id=%s model_id=%s text_len=%d "
         "output_format=%s custom_chunk_indexes=%s",
@@ -37,10 +41,6 @@ async def text_to_speech(voice_id: str, req: WrapperTTSRequest):
         req.output_format.value,
         bool(req.chunk_indexes),
     )
-
-    if not text.strip():
-        logger.warning("Rejected request: text was empty")
-        raise HTTPException(status_code=422, detail="text must not be empty")
 
     chunks = resolve_chunks(text, req.chunk_indexes)
 

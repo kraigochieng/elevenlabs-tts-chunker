@@ -1,6 +1,6 @@
 # elevenlabs-tts-chunker
 
-A FastAPI wrapper around the [ElevenLabs Text-to-Speech API](https://elevenlabs.io/docs/api-reference/text-to-speech) that transparently handles text longer than ElevenLabs' 10,000-character limit per request.
+A FastAPI wrapper around the [ElevenLabs Text-to-Speech API](https://elevenlabs.io/docs/api-reference/text-to-speech/convert) that transparently handles text longer than ElevenLabs' 10,000-character limit per request.
 
 It accepts a single block of text (of any length), splits it into safe chunks, synthesizes each chunk via ElevenLabs, and merges the resulting audio into one continuous mp3 — so callers don't need to think about the character limit at all.
 

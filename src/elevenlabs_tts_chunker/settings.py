@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     # Overridable via .env — set to DEBUG to see per-chunk text previews.
     log_level: str = "INFO"
 
+    # How many characters of surrounding source text to send as
+    # previous_text/next_text context on each chunk's ElevenLabs request, to
+    # improve prosody continuity across chunk seams. 0 disables the feature.
+    tts_context_chars: int = Field(500, ge=0)
+
     model_config = SettingsConfigDict(
         env_file=find_dotenv() or None,
         env_file_encoding="utf-8",

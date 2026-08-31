@@ -31,6 +31,8 @@ async def synthesize_chunk(
     apply_text_normalization: str,
     chunk_number: int,
     total_chunks: int,
+    previous_text: str | None = None,
+    next_text: str | None = None,
 ) -> bytes:
     """Calls the ElevenLabs SDK for a single chunk of text and collects the
     streamed audio bytes into one buffer."""
@@ -41,6 +43,13 @@ async def synthesize_chunk(
         len(text),
         voice_id,
         model_id,
+    )
+    logger.debug(
+        "Chunk %d/%d context | previous_text=%d chars next_text=%d chars",
+        chunk_number,
+        total_chunks,
+        len(previous_text or ""),
+        len(next_text or ""),
     )
     start_time = time.perf_counter()
 
@@ -54,6 +63,8 @@ async def synthesize_chunk(
             else None,
             output_format=output_format,
             apply_text_normalization=apply_text_normalization,
+            previous_text=previous_text,
+            next_text=next_text,
         )
         audio_bytes = b"".join([chunk async for chunk in audio_stream])
     except Exception as exc:

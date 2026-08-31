@@ -6,7 +6,12 @@ Loads configuration from environment variables / a .env file via pydantic-settin
 from functools import lru_cache
 
 from dotenv import find_dotenv
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# ElevenLabs' hard per-request character limit. default_max_chunk_chars must
+# stay below this — see the validator on Settings below.
+ELEVENLABS_HARD_CHAR_LIMIT = 10_000
 
 
 class Settings(BaseSettings):
@@ -24,11 +29,12 @@ class Settings(BaseSettings):
     elevenlabs_tts_path: str = "/v1/text-to-speech"
 
     # Headroom below ElevenLabs' hard 10,000 character limit per request.
-    # Overridable via .env if that limit ever changes or you want tighter
-    # margins.
-    default_max_chunk_chars: int = 9500
+    # Overridable via .env if you want tighter margins. Must stay strictly
+    # below ELEVENLABS_HARD_CHAR_LIMIT — see validator below.
+    default_max_chunk_chars: int = Field(9500, gt=0)
 
-    # Standard library logging level: DEBUG, INFO, WARNING, or ERROR.
+    # Standard library logging level name (DEBUG, INFO, WARNING, ERROR).
+    # Overridable via .env — set to DEBUG to see per-chunk text previews.
     log_level: str = "INFO"
 
     model_config = SettingsConfigDict(
@@ -36,6 +42,18 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @field_validator("default_max_chunk_chars")
+    @classmethod
+    def enforce_elevenlabs_char_limit(cls, v: int) -> int:
+        if v >= ELEVENLABS_HARD_CHAR_LIMIT:
+            raise ValueError(
+                f"default_max_chunk_chars ({v}) must be strictly less than "
+                f"ElevenLabs' hard per-request limit of {ELEVENLABS_HARD_CHAR_LIMIT} "
+                "characters — chunks at or above this size will be rejected "
+                "by the ElevenLabs API. Lower DEFAULT_MAX_CHUNK_CHARS in your .env."
+            )
+        return v
 
     @property
     def elevenlabs_tts_url(self) -> str:

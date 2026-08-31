@@ -1,6 +1,24 @@
 """
 Orchestration service — coordinates chunking, per-chunk synthesis, and audio
 merging for a single text-to-speech request.
+
+Chunk seam continuity is handled via ElevenLabs' request stitching
+(previous_request_ids/next_request_ids), which conditions each chunk's
+generation on the actual audio produced for its neighbors rather than on
+surrounding text. Because a chunk's next_request_ids can only reference a
+chunk that has already been generated, this runs in two passes:
+
+  1. Forward pass — generate every chunk in order, each one conditioned on
+     up to the 3 chunks already generated before it (previous_request_ids).
+  2. Correction pass — regenerate every chunk except the last, now that the
+     request_ids of chunks after it are known too, so every interior seam
+     is conditioned on real audio in both directions. The last chunk is
+     skipped: pass 1 already gave it full previous context, and it has no
+     next chunk to add.
+
+Pass 2 always references pass 1's request_ids (not other pass-2 results),
+so corrections are computed from one consistent snapshot rather than
+cascading.
 """
 
 import io
@@ -9,24 +27,20 @@ import time
 from fastapi import HTTPException
 
 from elevenlabs_tts_chunker.logging_config import logger
-from elevenlabs_tts_chunker.schemas import ChunkIndex, WrapperTTSRequest
+from elevenlabs_tts_chunker.schemas import WrapperTTSRequest
 from elevenlabs_tts_chunker.services.audio import merge_audio_chunks
 from elevenlabs_tts_chunker.services.chunking import resolve_chunks
-from elevenlabs_tts_chunker.services.tts import get_elevenlabs_client, synthesize_chunk
-from elevenlabs_tts_chunker.settings import get_settings
+from elevenlabs_tts_chunker.services.tts import (
+    MAX_STITCHING_REQUEST_IDS,
+    SynthesizedChunk,
+    get_elevenlabs_client,
+    synthesize_chunk,
+)
 
 
-def _surrounding_context(
-    text: str, chunk: ChunkIndex, context_chars: int
-) -> tuple[str | None, str | None]:
-    """Returns (previous_text, next_text): up to context_chars of the source
-    text immediately before/after this chunk, for seam continuity. Uses the
-    raw source text rather than neighboring chunks, so it works whether
-    chunks are contiguous (default auto-chunking) or caller-supplied with
-    gaps between them."""
-    previous_text = text[max(0, chunk.start - context_chars) : chunk.start]
-    next_text = text[chunk.end : chunk.end + context_chars]
-    return previous_text or None, next_text or None
+def _request_ids(results: list[SynthesizedChunk]) -> list[str] | None:
+    ids = [r.request_id for r in results if r.request_id]
+    return ids or None
 
 
 async def synthesize_speech(req: WrapperTTSRequest, voice_id: str) -> io.BytesIO:
@@ -46,18 +60,14 @@ async def synthesize_speech(req: WrapperTTSRequest, voice_id: str) -> io.BytesIO
     if voice_settings:
         logger.debug("Voice settings: %s", voice_settings)
 
-    context_chars = get_settings().tts_context_chars
-
     client = get_elevenlabs_client()
-    audio_chunks: list[bytes] = []
+
+    # Pass 1: forward synthesis, each chunk conditioned on the ones before it.
+    pass1_results: list[SynthesizedChunk] = []
     for i, c in enumerate(chunks):
-        segment_text = text[c.start : c.end]
-        previous_text, next_text = _surrounding_context(
-            text=text, chunk=c, context_chars=context_chars
-        )
-        audio_bytes = await synthesize_chunk(
+        result = await synthesize_chunk(
             client=client,
-            text=segment_text,
+            text=text[c.start : c.end],
             voice_id=voice_id,
             model_id=req.model_id,
             voice_settings=voice_settings,
@@ -65,13 +75,39 @@ async def synthesize_speech(req: WrapperTTSRequest, voice_id: str) -> io.BytesIO
             apply_text_normalization=req.apply_text_normalization.value,
             chunk_number=i + 1,
             total_chunks=len(chunks),
-            previous_text=previous_text,
-            next_text=next_text,
+            previous_request_ids=_request_ids(
+                pass1_results[-MAX_STITCHING_REQUEST_IDS:]
+            ),
+            pass_label="pass 1/forward",
         )
-        audio_chunks.append(audio_bytes)
+        pass1_results.append(result)
+
+    # Pass 2: regenerate every chunk but the last, now that both neighbors'
+    # request_ids are known, so every interior seam has real audio context
+    # in both directions.
+    final_results = list(pass1_results)
+    for i, c in enumerate(chunks[:-1]):
+        final_results[i] = await synthesize_chunk(
+            client=client,
+            text=text[c.start : c.end],
+            voice_id=voice_id,
+            model_id=req.model_id,
+            voice_settings=voice_settings,
+            output_format=req.output_format.value,
+            apply_text_normalization=req.apply_text_normalization.value,
+            chunk_number=i + 1,
+            total_chunks=len(chunks),
+            previous_request_ids=_request_ids(
+                pass1_results[:i][-MAX_STITCHING_REQUEST_IDS:]
+            ),
+            next_request_ids=_request_ids(
+                pass1_results[i + 1 : i + 1 + MAX_STITCHING_REQUEST_IDS]
+            ),
+            pass_label="pass 2/correction",
+        )
 
     out_buffer = merge_audio_chunks(
-        audio_chunks=audio_chunks,
+        audio_chunks=[r.audio_bytes for r in final_results],
         silence_between_chunks_ms=req.silence_between_chunks_ms,
     )
 

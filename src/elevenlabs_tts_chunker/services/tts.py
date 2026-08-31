@@ -4,6 +4,7 @@ speech generation.
 """
 
 import time
+from dataclasses import dataclass
 
 from elevenlabs import VoiceSettings as ElevenLabsVoiceSettings
 from elevenlabs.client import AsyncElevenLabs
@@ -12,6 +13,10 @@ from fastapi import HTTPException
 from elevenlabs_tts_chunker.logging_config import logger
 from elevenlabs_tts_chunker.settings import get_settings
 
+# ElevenLabs allows at most 3 previous_request_ids / next_request_ids per
+# request stitching call.
+MAX_STITCHING_REQUEST_IDS = 3
+
 
 def get_elevenlabs_client() -> AsyncElevenLabs:
     settings = get_settings()
@@ -19,6 +24,18 @@ def get_elevenlabs_client() -> AsyncElevenLabs:
         api_key=settings.elevenlabs_api_key,
         base_url=settings.elevenlabs_api_base,
     )
+
+
+@dataclass
+class SynthesizedChunk:
+    """Audio for one chunk, plus the request_id ElevenLabs assigned to it so
+    it can be used as previous_request_ids/next_request_ids on neighboring
+    chunks' requests (request stitching). request_id is None if the
+    response didn't carry one (e.g. logging/history disabled on the
+    account), in which case stitching against this chunk is skipped."""
+
+    audio_bytes: bytes
+    request_id: str | None
 
 
 async def synthesize_chunk(
@@ -31,30 +48,33 @@ async def synthesize_chunk(
     apply_text_normalization: str,
     chunk_number: int,
     total_chunks: int,
-    previous_text: str | None = None,
-    next_text: str | None = None,
-) -> bytes:
+    previous_request_ids: list[str] | None = None,
+    next_request_ids: list[str] | None = None,
+    pass_label: str = "synthesis",
+) -> SynthesizedChunk:
     """Calls the ElevenLabs SDK for a single chunk of text and collects the
-    streamed audio bytes into one buffer."""
+    streamed audio bytes plus the request_id ElevenLabs assigned to the
+    generation."""
     logger.info(
-        "Synthesizing chunk %d/%d (%d chars) via voice_id=%s model_id=%s",
+        "Synthesizing chunk %d/%d (%d chars) via voice_id=%s model_id=%s [%s]",
         chunk_number,
         total_chunks,
         len(text),
         voice_id,
         model_id,
+        pass_label,
     )
     logger.debug(
-        "Chunk %d/%d context | previous_text=%d chars next_text=%d chars",
+        "Chunk %d/%d context | previous_request_ids=%s next_request_ids=%s",
         chunk_number,
         total_chunks,
-        len(previous_text or ""),
-        len(next_text or ""),
+        previous_request_ids,
+        next_request_ids,
     )
     start_time = time.perf_counter()
 
     try:
-        audio_stream = client.text_to_speech.convert(
+        async with client.text_to_speech.with_raw_response.convert(
             voice_id=voice_id,
             text=text,
             model_id=model_id,
@@ -63,10 +83,11 @@ async def synthesize_chunk(
             else None,
             output_format=output_format,
             apply_text_normalization=apply_text_normalization,
-            previous_text=previous_text,
-            next_text=next_text,
-        )
-        audio_bytes = b"".join([chunk async for chunk in audio_stream])
+            previous_request_ids=previous_request_ids,
+            next_request_ids=next_request_ids,
+        ) as response:
+            audio_bytes = b"".join([chunk async for chunk in response.data])
+            request_id = response.headers.get("request-id")
     except Exception as exc:
         elapsed = time.perf_counter() - start_time
         logger.error(
@@ -80,10 +101,11 @@ async def synthesize_chunk(
 
     elapsed = time.perf_counter() - start_time
     logger.info(
-        "Chunk %d/%d synthesized OK in %.2fs (%d bytes returned)",
+        "Chunk %d/%d synthesized OK in %.2fs (%d bytes returned, request_id=%s)",
         chunk_number,
         total_chunks,
         elapsed,
         len(audio_bytes),
+        request_id,
     )
-    return audio_bytes
+    return SynthesizedChunk(audio_bytes=audio_bytes, request_id=request_id)

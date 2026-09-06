@@ -10,6 +10,7 @@ to the business logic in services/.
 
 from fastapi import FastAPI, Header
 from fastapi.responses import PlainTextResponse, StreamingResponse
+from pydantic import SecretStr
 
 from elevenlabs_tts_chunker.docs import render_api_docs
 from elevenlabs_tts_chunker.logging_config import logger
@@ -29,7 +30,7 @@ async def root() -> str:
 async def text_to_speech(
     voice_id: str,
     req: WrapperTTSRequest,
-    xi_api_key: str | None = Header(default=None, alias="xi-api-key"),
+    xi_api_key: SecretStr | None = Header(default=None, alias="xi-api-key"),
 ):
     logger.info(
         "Incoming TTS request | voice_id=%s model_id=%s text_len=%d "

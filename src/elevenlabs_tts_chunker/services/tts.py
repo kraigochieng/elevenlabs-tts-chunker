@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from elevenlabs import VoiceSettings as ElevenLabsVoiceSettings
 from elevenlabs.client import AsyncElevenLabs
 from fastapi import HTTPException
+from pydantic import SecretStr
 
 from elevenlabs_tts_chunker.logging_config import logger
 from elevenlabs_tts_chunker.settings import get_settings
@@ -18,7 +19,7 @@ from elevenlabs_tts_chunker.settings import get_settings
 MAX_STITCHING_REQUEST_IDS = 3
 
 
-def get_elevenlabs_client(api_key: str | None = None) -> AsyncElevenLabs:
+def get_elevenlabs_client(api_key: SecretStr | None = None) -> AsyncElevenLabs:
     """Builds an ElevenLabs client using api_key if given (from a caller's
     xi-api-key header), otherwise falling back to the server's configured
     default. Raises 401 if neither is available."""
@@ -31,7 +32,7 @@ def get_elevenlabs_client(api_key: str | None = None) -> AsyncElevenLabs:
             "xi-api-key header, or configure ELEVENLABS_API_KEY on the server.",
         )
     return AsyncElevenLabs(
-        api_key=resolved_key,
+        api_key=resolved_key.get_secret_value(),
         base_url=settings.elevenlabs_api_base,
     )
 

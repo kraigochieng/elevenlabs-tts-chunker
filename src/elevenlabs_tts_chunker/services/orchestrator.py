@@ -25,6 +25,7 @@ import io
 import time
 
 from fastapi import HTTPException
+from pydantic import SecretStr
 
 from elevenlabs_tts_chunker.logging_config import logger
 from elevenlabs_tts_chunker.schemas import WrapperTTSRequest
@@ -44,7 +45,7 @@ def _request_ids(results: list[SynthesizedChunk]) -> list[str] | None:
 
 
 async def synthesize_speech(
-    req: WrapperTTSRequest, voice_id: str, api_key: str | None = None
+    req: WrapperTTSRequest, voice_id: str, api_key: SecretStr | None = None
 ) -> io.BytesIO:
     """Runs the full chunk -> synthesize -> merge pipeline for one request.
     api_key, if given, is the caller's own key (from the xi-api-key header)

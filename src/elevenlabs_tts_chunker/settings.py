@@ -6,7 +6,7 @@ Loads configuration from environment variables / a .env file via pydantic-settin
 from functools import lru_cache
 
 from dotenv import find_dotenv
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # ElevenLabs' hard per-request character limit. default_max_chunk_chars must
@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     # Fallback ElevenLabs API key, used when a request doesn't supply its
     # own via the xi-api-key header. Optional: if unset, every request must
     # bring its own key, or it's rejected with a 401.
-    elevenlabs_api_key: str | None = None
+    elevenlabs_api_key: SecretStr | None = None
 
     # Base host for the ElevenLabs API — overridable via .env, e.g. for
     # pointing at a proxy, mock server, or a regional/enterprise endpoint.

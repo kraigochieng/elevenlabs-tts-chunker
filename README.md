@@ -14,19 +14,6 @@ ElevenLabs' `/v1/text-to-speech/{voice_id}` endpoint rejects requests where `tex
 
 This service handles all of that in one place, exposing an API shaped closely after ElevenLabs' own, so it can act as a near drop-in replacement in existing pipelines (e.g. n8n workflows) with minimal changes.
 
-## Features
-
-- Accepts text of any length — no manual pre-splitting required by the caller
-- Optional **caller-supplied chunk boundaries** (`chunk_indexes`) for full control over where splits happen, with overlap/bounds validation — see [Chunking Modes](#chunking-modes)
-- **Automatic chunking fallback** when no boundaries are supplied
-- Consistent `voice_id` / `voice_settings` applied across all chunks
-- **Seam continuity via ElevenLabs request stitching** — each chunk is conditioned on the actual audio generated for its neighbors, not just surrounding text
-- Audio merging via `pydub` (backed by `ffmpeg`) for clean, artifact-free concatenation
-- Optional silence padding between merged chunks
-- Returns a single finished mp3, regardless of how many chunks were needed internally
-- **Bring-your-own-key support** — callers can supply their own ElevenLabs API key per request via the `xi-api-key` header, so this can run as a multi-tenant proxy with no server-wide key at all
-- Self-documenting: `GET /` returns plain-text API docs generated live from the actual request schema
-
 ## Chunking Modes
 
 There are two ways a request's chunk boundaries get decided — pick whichever fits what you're sending.

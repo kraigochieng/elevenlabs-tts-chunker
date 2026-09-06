@@ -8,6 +8,8 @@ This module is intentionally thin — it wires HTTP request/response handling
 to the business logic in services/.
 """
 
+from datetime import UTC, datetime
+
 from fastapi import FastAPI, Header
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import SecretStr
@@ -20,6 +22,10 @@ from elevenlabs_tts_chunker.settings import get_settings
 
 app = FastAPI(title="elevenlabs-tts-chunker")
 
+# Module-level singleton so Header(...) isn't called in the function
+# signature's default value (ruff B008).
+_XI_API_KEY_HEADER = Header(default=None, alias="xi-api-key")
+
 
 @app.get("/", response_class=PlainTextResponse)
 async def root() -> str:
@@ -30,7 +36,7 @@ async def root() -> str:
 async def text_to_speech(
     voice_id: str,
     req: WrapperTTSRequest,
-    xi_api_key: SecretStr | None = Header(default=None, alias="xi-api-key"),
+    xi_api_key: SecretStr | None = _XI_API_KEY_HEADER,
 ):
     logger.info(
         "Incoming TTS request | voice_id=%s model_id=%s text_len=%d "
@@ -45,12 +51,13 @@ async def text_to_speech(
 
     out_buffer = await synthesize_speech(req=req, voice_id=voice_id, api_key=xi_api_key)
 
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    filename = f"{timestamp}_{voice_id}.mp3"
+
     return StreamingResponse(
         content=out_buffer,
         media_type="audio/mpeg",
-        headers={
-            "Content-Disposition": f'attachment; filename="{voice_id}_merged.mp3"'
-        },
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

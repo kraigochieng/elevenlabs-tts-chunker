@@ -35,15 +35,19 @@ There are two ways a request's chunk boundaries get decided — pick whichever f
 
 Send just `text` and omit `chunk_indexes`, and the service computes the boundaries for you:
 
-1. Walk the text, accumulating characters up to a safe threshold below the 10,000-character limit (default ~9,500, leaving headroom).
+1. Walk the text, accumulating characters up to a safe threshold below the 10,000-character limit (default ~9,500, configurable via `DEFAULT_MAX_CHUNK_CHARS`, leaving headroom).
 2. Rather than cutting at an arbitrary offset, back off to the nearest whitespace boundary so no word is split mid-token.
 3. Repeat until the entire input is covered by a sequence of ordered `{start, end}` pairs.
+
+Text is only ever split when it's actually longer than that threshold. If your whole `text` already fits under it, it's sent as a single chunk — nothing is divided at all.
 
 This is the easiest path — send your whole `text` and nothing else. Good default for a single continuous passage with no internal structure that matters.
 
 ### Mode 2: Manual chunking (`chunk_indexes`)
 
 Supply your own list of `{start, end}` character offsets into `text` instead, and the service uses exactly those boundaries rather than computing its own. Chunks must not overlap, but gaps between them are fine (see the worked example below).
+
+This only takes effect when it's actually needed: if your full `text` is already at or under the automatic-chunking threshold above, any `chunk_indexes` you supply are ignored — the request is treated as a single chunk instead (same as Mode 1), and a warning is logged explaining why. There's no point paying for extra ElevenLabs requests (and the request-stitching overhead that comes with multiple chunks) to split text that already fits in one call.
 
 **Why you'd want this.** Automatic chunking is safe but has no idea about your content's structure — it just walks characters and backs off to the nearest whitespace. That's fine for one continuous passage, but it can go wrong for anything with real internal structure:
 
@@ -75,7 +79,9 @@ function paragraphsToChunkIndexes(text) {
 }
 ```
 
-**Worked example.** Given this `text` — three short paragraphs:
+**Worked example.** This short passage is kept small purely so it's easy to read and hand-verify below — a real request this size (well under the ~9,500-character threshold) would actually have its `chunk_indexes` ignored per the note above. The offset mechanism itself works exactly the same at any length: it's just character positions into `text`.
+
+Given this `text` — three short paragraphs:
 
 ```
 Welcome to the daily brief. Here are today's top stories.
@@ -109,7 +115,7 @@ The corresponding request:
 }
 ```
 
-Each row of the table above maps directly to one entry in `chunk_indexes` — that's the whole mechanism. Each chunk then gets synthesized separately and merged back into one mp3, same as in automatic mode.
+Each row of the table above maps directly to one entry in `chunk_indexes` — that's the whole mechanism. At a length that actually needs splitting, each chunk gets synthesized separately and merged back into one mp3, same as in automatic mode.
 
 ## How it works
 

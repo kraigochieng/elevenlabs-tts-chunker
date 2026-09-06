@@ -17,7 +17,7 @@ def default_chunk_indexes(text: str, max_chars: int | None = None) -> list[Chunk
         max_chars = get_settings().default_max_chunk_chars
 
     logger.debug(
-        "No chunk_indexes supplied — computing default chunks (max_chars=%d, text_len=%d)",
+        "Computing default chunks (max_chars=%d, text_len=%d)",
         max_chars,
         len(text),
     )
@@ -62,11 +62,29 @@ def resolve_chunks(
     text: str, chunk_indexes: list[ChunkIndex] | None
 ) -> list[ChunkIndex]:
     """Returns caller-supplied chunk_indexes if given, otherwise computes and
-    logs the default chunk plan."""
-    if chunk_indexes:
-        log_chunk_plan(chunks=chunk_indexes, text=text, source="caller-supplied")
-        return chunk_indexes
+    logs the default chunk plan.
 
-    chunks = default_chunk_indexes(text=text)
+    If the full text already fits under the automatic-chunking threshold,
+    splitting isn't needed at all — caller-supplied chunk_indexes are
+    ignored in that case (a warning is logged) and the text is treated as
+    a single chunk instead.
+    """
+    max_chars = get_settings().default_max_chunk_chars
+
+    if chunk_indexes:
+        if len(text) <= max_chars:
+            logger.warning(
+                "Ignoring %d caller-supplied chunk_indexes: text is %d chars, "
+                "at or under the %d-char auto-chunking threshold, so no "
+                "splitting is needed",
+                len(chunk_indexes),
+                len(text),
+                max_chars,
+            )
+        else:
+            log_chunk_plan(chunks=chunk_indexes, text=text, source="caller-supplied")
+            return chunk_indexes
+
+    chunks = default_chunk_indexes(text=text, max_chars=max_chars)
     log_chunk_plan(chunks=chunks, text=text, source="auto-computed")
     return chunks

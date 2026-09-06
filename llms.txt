@@ -1,0 +1,67 @@
+# elevenlabs-tts-chunker
+
+> A self-hosted FastAPI wrapper around the [ElevenLabs Text-to-Speech API](https://elevenlabs.io/docs/api-reference/text-to-speech/convert). It accepts text of any length, splits it into safe chunks below ElevenLabs' 10,000-character per-request limit, synthesizes each chunk (keeping voice and settings consistent), and merges the audio back into a single mp3. Its request shape mirrors ElevenLabs' own endpoint so it can drop into an existing pipeline (e.g. an n8n workflow) with minimal changes. Not affiliated with ElevenLabs; you bring your own API key.
+
+## How it works
+
+- Chunking: If `text` fits under `DEFAULT_MAX_CHUNK_CHARS` (default 9,500), it is sent as one chunk. Otherwise it is split. Two modes: automatic (count characters, back off to the nearest space so no word is cut) or manual via `chunk_indexes` (caller supplies a list of non-overlapping `{start, end}` character ranges in `text`; gaps allowed). Manual `chunk_indexes` are ignored when the text already fits in one request.
+- Synthesis: Each chunk is a separate call to `/v1/text-to-speech/{voice_id}` with the same `voice_id` and `voice_settings`. Multi-chunk requests use ElevenLabs request stitching (`previous_request_ids`/`next_request_ids`) in two passes — a forward pass, then a correction pass over every chunk except the last — costing roughly `2N-1` ElevenLabs calls for N chunks. Requires logging/history enabled on the ElevenLabs account (the default) and does not work with `eleven_v3`.
+- Merging: mp3 chunks are joined with `pydub` (via `ffmpeg`) to avoid seam glitches, with an optional `silence_between_chunks_ms` gap. Result is one continuous mp3.
+
+## API
+
+- `POST /v1/text-to-speech/{voice_id}` — main endpoint. JSON body: `text` (required), `model_id` (default `eleven_multilingual_v2`), `language_code`, `chunk_indexes` (list of `{start, end}`), `voice_settings` (`stability`, `similarity_boost`, `style`, `use_speaker_boost`, `speed`), `output_format` (default `mp3_44100_128`), `apply_text_normalization` (`auto`/`on`/`off`), `silence_between_chunks_ms` (default 300). Optional `xi-api-key` header for a caller-supplied key (takes precedence over the server default; a request with neither gets 401). Returns an `audio/mpeg` stream as an attachment.
+- `GET /` — the API reference as plain text.
+- `GET /docs` — interactive Swagger UI generated from the request schema.
+- `GET /health` — returns `{"status": "ok", "api_key_loaded": bool}`; `api_key_loaded` reflects only the server's default key.
+
+## Configuration
+
+Environment variables, all optional (see `.env.example`):
+
+- `ELEVENLABS_API_KEY` — server-wide fallback key. Leave unset to require every caller to bring their own via the `xi-api-key` header (turns the service into a keyless shared proxy).
+- `ELEVENLABS_API_BASE` — base host for the ElevenLabs API. Default `https://api.elevenlabs.io`.
+- `ELEVENLABS_TTS_PATH` — versioned TTS resource path, kept for reference. Default `/v1/text-to-speech`.
+- `DEFAULT_MAX_CHUNK_CHARS` — headroom below the 10,000-character limit for automatic chunking. Default 9500.
+- `LOG_LEVEL` — `DEBUG`, `INFO`, `WARNING`, or `ERROR`. Default `INFO`.
+
+## Deployment
+
+This project is meant to be forked and run by you.
+
+- Docker (recommended): the repo's multi-stage `Dockerfile` installs `ffmpeg` and runs as a non-root user. Works on Railway, Render, Fly.io, a plain VM, etc. `docker build -t elevenlabs-tts-chunker .` then `docker run -p 8000:8000 -e ELEVENLABS_API_KEY=... elevenlabs-tts-chunker`.
+- Vercel: use `Dockerfile.vercel` (Vercel's native Python runtime lacks `ffmpeg`). It differs from `Dockerfile` only in listening on `$PORT`; keep build-step changes in sync between the two.
+- Anywhere else: any Python web process works as long as `ffmpeg` is on `PATH`.
+
+## Local development
+
+Requires Python 3.11+ (repo pins 3.12), [`uv`](https://docs.astral.sh/uv/), and `ffmpeg` on `PATH`.
+
+```bash
+git clone https://github.com/kraigochieng/elevenlabs-tts-chunker.git
+cd elevenlabs-tts-chunker
+uv sync
+uv run uvicorn elevenlabs_tts_chunker.main:app --reload --port 8000
+```
+
+## Source layout
+
+- `src/elevenlabs_tts_chunker/main.py` — FastAPI app; thin HTTP layer wiring routes to services.
+- `src/elevenlabs_tts_chunker/schemas.py` — Pydantic request schemas, including `chunk_indexes` overlap/bounds validation.
+- `src/elevenlabs_tts_chunker/settings.py` — environment-variable settings.
+- `src/elevenlabs_tts_chunker/docs.py` — plain-text API reference served at `/`.
+- `src/elevenlabs_tts_chunker/services/chunking.py` — resolves automatic vs. manual chunk boundaries.
+- `src/elevenlabs_tts_chunker/services/tts.py` — ElevenLabs client and per-chunk synthesis.
+- `src/elevenlabs_tts_chunker/services/orchestrator.py` — the chunk → synthesize (two-pass stitching) → merge pipeline.
+- `src/elevenlabs_tts_chunker/services/audio.py` — mp3 merging with `pydub`/`ffmpeg`.
+
+## Usage in n8n
+
+1. Build `text` (and optionally `chunk_indexes`) in a Code node.
+2. Point an HTTP Request node at your deployed instance's `/v1/text-to-speech/{voice_id}` endpoint instead of ElevenLabs'.
+3. Set the HTTP Request node's response format to File / Binary.
+4. The returned mp3 is already fully merged.
+
+## License
+
+MIT. You may run it as your own paid or private service; keep the copyright notice.

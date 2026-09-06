@@ -77,13 +77,15 @@ docker run -p 8000:8000 -e ELEVENLABS_API_KEY=your_api_key_here elevenlabs-tts-c
 
 This works as-is on any platform that runs a Docker image (Railway, Render, Fly.io, a plain VM, etc.) — just set your environment variables through that platform's usual mechanism.
 
-**Vercel.** `pyproject.toml` already declares the entrypoint (`[tool.vercel]`) Vercel's Python runtime needs:
+**Vercel.** The repo includes [`Dockerfile.vercel`](Dockerfile.vercel) — a symlink to the same [`Dockerfile`](Dockerfile) used above. Vercel builds any `Dockerfile.vercel` it finds at the repo root into a container-backed Function instead of using its native Python runtime, which means `ffmpeg` is available exactly as it is in the plain Docker image, with no separate file to keep in sync.
 
 1. Import the forked repo at [vercel.com/new](https://vercel.com/new) (or run `vercel` from the repo root).
 2. Set `ELEVENLABS_API_KEY` (and any other overrides you want) under Project Settings → Environment Variables.
 3. Deploy.
 
-Vercel's Python runtime is a serverless/managed environment rather than a full container, so it may not include `ffmpeg` out of the box the way the Docker image does. If multi-chunk requests (the ones that actually need audio merging) fail there, that's the first thing to check — vendoring a static `ffmpeg` binary into the deployment, or switching to Docker-based hosting, resolves it.
+The container must listen on the port Vercel provides via the `PORT` env var — the `Dockerfile`/`Dockerfile.vercel` CMD already handles this, falling back to `8000` when `PORT` isn't set (e.g. plain `docker run`).
+
+If you'd rather use Vercel's native Python runtime instead of the Docker path (e.g. `pyproject.toml`'s `[tool.vercel]` entrypoint targets that), delete or rename `Dockerfile.vercel` — but note that runtime is a serverless/managed environment rather than a full container, so it may not include `ffmpeg` out of the box, which multi-chunk requests need for audio merging.
 
 **Anywhere else.** Any platform that can run a Python web process works, as long as `ffmpeg` is available on `PATH`. See [Requirements](#requirements) below for running it directly without Docker.
 

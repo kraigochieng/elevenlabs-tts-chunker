@@ -41,4 +41,7 @@ USER app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "elevenlabs_tts_chunker.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Shell form (with `exec`, so uvicorn becomes PID 1 and gets signals
+# directly) so $PORT — injected by Vercel, Railway, Render, etc. — is
+# honored when set, while still defaulting to 8000 for plain `docker run`.
+CMD exec uvicorn elevenlabs_tts_chunker.main:app --host 0.0.0.0 --port ${PORT:-8000}

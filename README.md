@@ -133,7 +133,7 @@ The intended way to use this project is to fork it on GitHub and deploy your own
 
 1. Fork [kraigochieng/elevenlabs-tts-chunker](https://github.com/kraigochieng/elevenlabs-tts-chunker) on GitHub.
 2. Copy [`.env.example`](.env.example) to `.env` and fill in what you need. Everything in it is optional:
-   - `ELEVENLABS_API_KEY` — a server-wide fallback key. Leave it unset if you'd rather have every caller supply their own via the `xi-api-key` header (see [Configuration](#configuration) below).
+   - `ELEVENLABS_API_KEY` — a server-wide fallback key. Any request can instead (or additionally) supply its own key via the `xi-api-key` header, same as ElevenLabs' own API — it takes precedence over this default when present. If a request has neither, it gets a `401`. Leave `ELEVENLABS_API_KEY` unset entirely to require every caller to bring their own key, running this as a multi-tenant proxy with no server-wide key at all.
    - `DEFAULT_MAX_CHUNK_CHARS`, `LOG_LEVEL` — tuning knobs with sane defaults; see the comments in `.env.example`.
 
 ### 2. Deploy
@@ -149,7 +149,7 @@ docker run -p 8000:8000 -e ELEVENLABS_API_KEY=your_api_key_here elevenlabs-tts-c
 
 This works as-is on any platform that runs a Docker image (Railway, Render, Fly.io, a plain VM, etc.) — just set your environment variables through that platform's usual mechanism.
 
-**Vercel.** The repo includes [`Dockerfile.vercel`](Dockerfile.vercel) — a Vercel-specific variant of [`Dockerfile`](Dockerfile), kept as its own file since Vercel Functions must listen on the port given via `$PORT` rather than a fixed one. Vercel builds any `Dockerfile.vercel` it finds at the repo root into a container-backed Function instead of using its native Python runtime, which means `ffmpeg` is available exactly as it is in the plain Docker image.
+**Vercel.** Use the Docker path via [`Dockerfile.vercel`](Dockerfile.vercel) — Vercel's native Python runtime does not include `ffmpeg`, which multi-chunk requests need for audio merging, so it isn't a viable option for this project. `Dockerfile.vercel` is a Vercel-specific variant of [`Dockerfile`](Dockerfile), kept as its own file since Vercel Functions must listen on the port given via `$PORT` rather than a fixed one. Vercel builds any `Dockerfile.vercel` it finds at the repo root into a container-backed Function instead of using that native runtime, so `ffmpeg` is available exactly as it is in the plain Docker image.
 
 1. Import the forked repo at [vercel.com/new](https://vercel.com/new) (or run `vercel` from the repo root).
 2. Set `ELEVENLABS_API_KEY` (and any other overrides you want) under Project Settings → Environment Variables.
@@ -157,134 +157,40 @@ This works as-is on any platform that runs a Docker image (Railway, Render, Fly.
 
 If you change the build steps in `Dockerfile`, mirror the change in `Dockerfile.vercel` too — they're two separate files, not a symlink, because their `CMD` genuinely differs.
 
-If you'd rather use Vercel's native Python runtime instead of the Docker path (e.g. `pyproject.toml`'s `[tool.vercel]` entrypoint targets that), delete or rename `Dockerfile.vercel` — but note that runtime is a serverless/managed environment rather than a full container, so it may not include `ffmpeg` out of the box, which multi-chunk requests need for audio merging.
+**Anywhere else.** Any platform that can run a Python web process works, as long as `ffmpeg` is available on `PATH`. See [Local Development](#local-development) below for running it directly without Docker.
 
-**Anywhere else.** Any platform that can run a Python web process works, as long as `ffmpeg` is available on `PATH`. See [Requirements](#requirements) below for running it directly without Docker.
+## Local Development
 
-## Requirements
-
-For running directly (without Docker):
-
-- Python 3.11+ (the repo is pinned to 3.12 via `.python-version`)
-- [`uv`](https://docs.astral.sh/uv/) for dependency management
-- `ffmpeg` installed and available on `PATH` (required by `pydub`)
-- An ElevenLabs API key — either configured on the server, or supplied by each caller via the `xi-api-key` header (see Configuration)
-
-## Installation (local development)
+Requires Python 3.11+ (the repo is pinned to 3.12 via `.python-version`), [`uv`](https://docs.astral.sh/uv/), and `ffmpeg` on `PATH`.
 
 ```bash
 git clone https://github.com/kraigochieng/elevenlabs-tts-chunker.git
 cd elevenlabs-tts-chunker
 uv sync
-```
 
-Install `ffmpeg`:
-```bash
-# macOS
+# ffmpeg — macOS
 brew install ffmpeg
-
-# Debian/Ubuntu
+# ffmpeg — Debian/Ubuntu
 apt install ffmpeg
 ```
 
-## Configuration
-
-`ELEVENLABS_API_KEY` is optional and acts as a fallback default. Set it as an environment variable:
-
-```bash
-export ELEVENLABS_API_KEY=your_api_key_here
-```
-
-Or via a `.env` file (see [`.env.example`](.env.example) for the full list of options):
-```
-ELEVENLABS_API_KEY=your_api_key_here
-```
-
-Any request can instead (or additionally) supply its own key via the `xi-api-key` header, same as ElevenLabs' own API — it takes precedence over the server default when present. If a request has neither, it gets a `401`. This lets the service run as a multi-tenant proxy with no server-wide key configured at all, if every caller brings their own.
-
-## Running locally
+Configure your `.env` as described in [Fork & Deploy](#fork--deploy) above, then run:
 
 ```bash
 uv run uvicorn elevenlabs_tts_chunker.main:app --reload --port 8000
 ```
 
-The service will be available at `http://localhost:8000` — `GET /` there returns plain-text API docs generated live from the code, `GET /health` is a basic health check.
+The service is now at `http://localhost:8000` — see [API Reference](#api-reference) below.
 
 ## API Reference
 
-### `POST /v1/text-to-speech/{voice_id}`
+Launch the app (see [Local Development](#local-development) or [Fork & Deploy](#fork--deploy)), then visit:
 
-Mimics the shape of ElevenLabs' own endpoint, with additional chunking-related fields.
+- `GET /docs` — interactive Swagger UI, generated live from the code — try requests directly in the browser
+- `GET /` — the same reference as plain text
+- `GET /health` — basic health check (`{"status": "ok", "api_key_loaded": bool}`; `api_key_loaded` reflects the server's default key only)
 
-#### Path parameters
-
-| Name | Type | Description |
-|---|---|---|
-| `voice_id` | string | ElevenLabs voice ID to use for synthesis |
-
-#### Headers
-
-| Header | Required | Description |
-|---|---|---|
-| `xi-api-key` | No | Your own ElevenLabs API key, same as ElevenLabs' own API. Overrides the server's default key when present. Required if the server has no `ELEVENLABS_API_KEY` configured. |
-
-#### Request body
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `text` | string | Yes | Full text to synthesize, of any length |
-| `model_id` | string | No | ElevenLabs model ID. Defaults to `eleven_multilingual_v2` |
-| `language_code` | string | No | ISO 639-1 code to enforce a language. Ignored by `multilingual_v2` |
-| `chunk_indexes` | array of `{start, end}` | No | Caller-supplied, non-overlapping chunk boundaries. If omitted, chunks are computed automatically |
-| `voice_settings` | object | No | Passed through to ElevenLabs on every chunk (`stability`, `similarity_boost`, `style`, `use_speaker_boost`, `speed`) |
-| `output_format` | string | No | ElevenLabs output format, e.g. `mp3_44100_128`. Defaults to `mp3_44100_128` |
-| `apply_text_normalization` | string | No | `auto` \| `on` \| `off`. Defaults to `auto` |
-| `silence_between_chunks_ms` | integer | No | Milliseconds of silence inserted at each chunk seam. Defaults to `300` |
-
-#### Example request
-
-```json
-{
-  "text": "Hi, I'm Robin with your top events for today's brief...\n\nStory 1: ...\n\nStory 2: ...",
-  "voice_id": "wyWA56cQNU2KqUW4eCsI",
-  "voice_settings": {
-    "speed": 1.0
-  }
-}
-```
-
-With caller-supplied boundaries (see [Chunking Modes](#chunking-modes) for a fully worked example with real offsets):
-
-```json
-{
-  "text": "...",
-  "voice_id": "wyWA56cQNU2KqUW4eCsI",
-  "chunk_indexes": [
-    { "start": 0, "end": 9200 },
-    { "start": 9200, "end": 18100 }
-  ]
-}
-```
-
-#### Response
-
-Returns the merged audio as a binary mp3 stream (`Content-Type: audio/mpeg`), with a `Content-Disposition` header suggesting a timestamped filename.
-
-#### Errors
-
-| Status | Meaning |
-|---|---|
-| `401` | No ElevenLabs API key available (no `xi-api-key` header, and no server-side `ELEVENLABS_API_KEY`) |
-| `422` | Request validation error — empty `text`, or `chunk_indexes` out of bounds/overlapping |
-| `502` | Upstream ElevenLabs API error on one of the chunk requests |
-
-### Other endpoints
-
-| Endpoint | Description |
-|---|---|
-| `GET /` | Plain-text API docs, generated live from the request schema |
-| `GET /docs` | Interactive Swagger UI, auto-generated by FastAPI |
-| `GET /health` | `{"status": "ok", "api_key_loaded": bool}` — `api_key_loaded` reflects the server's default key only |
+Both docs endpoints are generated straight from the actual request schema, so they can't drift out of sync the way a hand-written reference here could. See [Chunking Modes](#chunking-modes) above for a worked example of the trickiest field (`chunk_indexes`).
 
 ## Usage in n8n
 

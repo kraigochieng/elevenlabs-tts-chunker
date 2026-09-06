@@ -23,6 +23,3 @@ elevenlabs-tts-chunker = "elevenlabs_tts_chunker:main"
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]
 build-backend = "uv_build"
-
-[tool.vercel]
-entrypoint = "src.elevenlabs_tts_chunker.main:app"

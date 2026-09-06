@@ -77,13 +77,13 @@ docker run -p 8000:8000 -e ELEVENLABS_API_KEY=your_api_key_here elevenlabs-tts-c
 
 This works as-is on any platform that runs a Docker image (Railway, Render, Fly.io, a plain VM, etc.) — just set your environment variables through that platform's usual mechanism.
 
-**Vercel.** The repo includes [`Dockerfile.vercel`](Dockerfile.vercel) — a symlink to the same [`Dockerfile`](Dockerfile) used above. Vercel builds any `Dockerfile.vercel` it finds at the repo root into a container-backed Function instead of using its native Python runtime, which means `ffmpeg` is available exactly as it is in the plain Docker image, with no separate file to keep in sync.
+**Vercel.** The repo includes [`Dockerfile.vercel`](Dockerfile.vercel) — a Vercel-specific variant of [`Dockerfile`](Dockerfile), kept as its own file since Vercel Functions must listen on the port given via `$PORT` rather than a fixed one. Vercel builds any `Dockerfile.vercel` it finds at the repo root into a container-backed Function instead of using its native Python runtime, which means `ffmpeg` is available exactly as it is in the plain Docker image.
 
 1. Import the forked repo at [vercel.com/new](https://vercel.com/new) (or run `vercel` from the repo root).
 2. Set `ELEVENLABS_API_KEY` (and any other overrides you want) under Project Settings → Environment Variables.
 3. Deploy.
 
-The container must listen on the port Vercel provides via the `PORT` env var — the `Dockerfile`/`Dockerfile.vercel` CMD already handles this, falling back to `8000` when `PORT` isn't set (e.g. plain `docker run`).
+If you change the build steps in `Dockerfile`, mirror the change in `Dockerfile.vercel` too — they're two separate files, not a symlink, because their `CMD` genuinely differs.
 
 If you'd rather use Vercel's native Python runtime instead of the Docker path (e.g. `pyproject.toml`'s `[tool.vercel]` entrypoint targets that), delete or rename `Dockerfile.vercel` — but note that runtime is a serverless/managed environment rather than a full container, so it may not include `ffmpeg` out of the box, which multi-chunk requests need for audio merging.
 

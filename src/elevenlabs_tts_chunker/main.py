@@ -8,7 +8,7 @@ This module is intentionally thin — it wires HTTP request/response handling
 to the business logic in services/.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Header
 from fastapi.responses import PlainTextResponse, StreamingResponse
 
 from elevenlabs_tts_chunker.docs import render_api_docs
@@ -26,18 +26,23 @@ async def root() -> str:
 
 
 @app.post("/v1/text-to-speech/{voice_id}")
-async def text_to_speech(voice_id: str, req: WrapperTTSRequest):
+async def text_to_speech(
+    voice_id: str,
+    req: WrapperTTSRequest,
+    xi_api_key: str | None = Header(default=None, alias="xi-api-key"),
+):
     logger.info(
         "Incoming TTS request | voice_id=%s model_id=%s text_len=%d "
-        "output_format=%s custom_chunk_indexes=%s",
+        "output_format=%s custom_chunk_indexes=%s caller_supplied_key=%s",
         voice_id,
         req.model_id,
         len(req.text),
         req.output_format.value,
         bool(req.chunk_indexes),
+        bool(xi_api_key),
     )
 
-    out_buffer = await synthesize_speech(req=req, voice_id=voice_id)
+    out_buffer = await synthesize_speech(req=req, voice_id=voice_id, api_key=xi_api_key)
 
     return StreamingResponse(
         content=out_buffer,

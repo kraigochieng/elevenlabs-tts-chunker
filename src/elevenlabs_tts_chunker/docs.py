@@ -38,6 +38,14 @@ POST /v1/text-to-speech/{{voice_id}}
 
   voice_id (path) — the ElevenLabs voice ID to synthesize with.
 
+Headers:
+
+  xi-api-key                    string, optional
+      Your own ElevenLabs API key, same as ElevenLabs' own API. If given,
+      it's used for this request instead of the server's default key. If
+      omitted, the server's ELEVENLABS_API_KEY is used instead. If neither
+      is available, the request is rejected with 401.
+
 Request body (JSON):
 
   text                          string, required
@@ -77,6 +85,8 @@ Response:
 
   200 audio/mpeg — the merged mp3, streamed, with
       Content-Disposition: attachment; filename="{{voice_id}}_merged.mp3"
+  401 — no ElevenLabs API key available (no xi-api-key header and no
+      server-side ELEVENLABS_API_KEY configured)
   422 — text was empty, or chunk_indexes failed validation
   502 — the ElevenLabs API call for a chunk failed
 
@@ -102,6 +112,9 @@ OTHER ENDPOINTS
 ----------------
 
 GET /health   — {{"status": "ok", "api_key_loaded": bool}}
+                  api_key_loaded reflects the server's default key only —
+                  it's fine for this to be false if callers always supply
+                  their own xi-api-key header.
 GET /docs     — interactive Swagger UI (auto-generated from the schema)
 GET /         — this page
 """

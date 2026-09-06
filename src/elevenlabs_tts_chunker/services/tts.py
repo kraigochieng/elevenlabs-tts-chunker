@@ -18,10 +18,20 @@ from elevenlabs_tts_chunker.settings import get_settings
 MAX_STITCHING_REQUEST_IDS = 3
 
 
-def get_elevenlabs_client() -> AsyncElevenLabs:
+def get_elevenlabs_client(api_key: str | None = None) -> AsyncElevenLabs:
+    """Builds an ElevenLabs client using api_key if given (from a caller's
+    xi-api-key header), otherwise falling back to the server's configured
+    default. Raises 401 if neither is available."""
     settings = get_settings()
+    resolved_key = api_key or settings.elevenlabs_api_key
+    if not resolved_key:
+        raise HTTPException(
+            status_code=401,
+            detail="No ElevenLabs API key available: supply one via the "
+            "xi-api-key header, or configure ELEVENLABS_API_KEY on the server.",
+        )
     return AsyncElevenLabs(
-        api_key=settings.elevenlabs_api_key,
+        api_key=resolved_key,
         base_url=settings.elevenlabs_api_base,
     )
 

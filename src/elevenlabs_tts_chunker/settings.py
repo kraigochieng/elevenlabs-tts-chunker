@@ -15,7 +15,10 @@ ELEVENLABS_HARD_CHAR_LIMIT = 10_000
 
 
 class Settings(BaseSettings):
-    elevenlabs_api_key: str
+    # Fallback ElevenLabs API key, used when a request doesn't supply its
+    # own via the xi-api-key header. Optional: if unset, every request must
+    # bring its own key, or it's rejected with a 401.
+    elevenlabs_api_key: str | None = None
 
     # Base host for the ElevenLabs API — overridable via .env, e.g. for
     # pointing at a proxy, mock server, or a regional/enterprise endpoint.

@@ -43,14 +43,21 @@ def _request_ids(results: list[SynthesizedChunk]) -> list[str] | None:
     return ids or None
 
 
-async def synthesize_speech(req: WrapperTTSRequest, voice_id: str) -> io.BytesIO:
-    """Runs the full chunk -> synthesize -> merge pipeline for one request."""
+async def synthesize_speech(
+    req: WrapperTTSRequest, voice_id: str, api_key: str | None = None
+) -> io.BytesIO:
+    """Runs the full chunk -> synthesize -> merge pipeline for one request.
+    api_key, if given, is the caller's own key (from the xi-api-key header)
+    and takes precedence over the server's configured default."""
     request_start = time.perf_counter()
     text = req.text
 
     if not text.strip():
         logger.warning("Rejected request: text was empty")
         raise HTTPException(status_code=422, detail="text must not be empty")
+
+    # Resolve before any chunking work so a missing key fails fast.
+    client = get_elevenlabs_client(api_key=api_key)
 
     chunks = resolve_chunks(text=text, chunk_indexes=req.chunk_indexes)
 
@@ -59,8 +66,6 @@ async def synthesize_speech(req: WrapperTTSRequest, voice_id: str) -> io.BytesIO
     )
     if voice_settings:
         logger.debug("Voice settings: %s", voice_settings)
-
-    client = get_elevenlabs_client()
 
     # Pass 1: forward synthesis, each chunk conditioned on the ones before it.
     pass1_results: list[SynthesizedChunk] = []

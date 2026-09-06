@@ -48,7 +48,8 @@ The final output is returned as a single continuous mp3 file. From the caller's 
 
 - Python 3.10+
 - `ffmpeg` installed and available on `PATH` (required by `pydub`)
-- An ElevenLabs API key
+- An ElevenLabs API key — either configured on the server, or supplied by
+  each caller via the `xi-api-key` header (see Configuration)
 
 ## Installation
 
@@ -78,7 +79,8 @@ apt install ffmpeg
 
 ## Configuration
 
-Set your ElevenLabs API key as an environment variable:
+`ELEVENLABS_API_KEY` is optional and acts as a fallback default. Set it as
+an environment variable:
 
 ```bash
 export ELEVENLABS_API_KEY=your_api_key_here
@@ -88,6 +90,12 @@ Or via a `.env` file:
 ```
 ELEVENLABS_API_KEY=your_api_key_here
 ```
+
+Any request can instead (or additionally) supply its own key via the
+`xi-api-key` header, same as ElevenLabs' own API — it takes precedence over
+the server default when present. If a request has neither, it gets a 401.
+This lets the service run as a multi-tenant proxy with no server-wide key
+configured at all, if every caller brings their own.
 
 ## Running locally
 

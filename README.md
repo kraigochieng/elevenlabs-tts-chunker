@@ -47,7 +47,7 @@ This is the easiest path — send your whole `text` and nothing else. Good defau
 
 Supply your own list of `{start, end}` character offsets into `text` instead, and the service uses exactly those boundaries rather than computing its own. Chunks must not overlap, but gaps between them are fine (see the worked example below).
 
-This only takes effect when it's actually needed: if your full `text` is already at or under the automatic-chunking threshold above, any `chunk_indexes` you supply are ignored — the request is treated as a single chunk instead (same as Mode 1), and a warning is logged explaining why. There's no point paying for extra ElevenLabs requests (and the request-stitching overhead that comes with multiple chunks) to split text that already fits in one call.
+This only takes effect when it's actually needed: if your full `text` is already at or under the automatic-chunking threshold above, any `chunk_indexes` you supply are ignored — the request is treated as a single chunk instead (same as Mode 1), and this is logged explaining why. There's no point paying for extra ElevenLabs requests (and the request-stitching overhead that comes with multiple chunks) to split text that already fits in one call.
 
 **Why you'd want this.** Automatic chunking is safe but has no idea about your content's structure — it just walks characters and backs off to the nearest whitespace. That's fine for one continuous passage, but it can go wrong for anything with real internal structure:
 

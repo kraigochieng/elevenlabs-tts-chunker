@@ -66,14 +66,14 @@ def resolve_chunks(
 
     If the full text already fits under the automatic-chunking threshold,
     splitting isn't needed at all — caller-supplied chunk_indexes are
-    ignored in that case (a warning is logged) and the text is treated as
+    ignored in that case (logged at info level) and the text is treated as
     a single chunk instead.
     """
     max_chars = get_settings().default_max_chunk_chars
 
     if chunk_indexes:
         if len(text) <= max_chars:
-            logger.warning(
+            logger.info(
                 "Ignoring %d caller-supplied chunk_indexes: text is %d chars, "
                 "at or under the %d-char auto-chunking threshold, so no "
                 "splitting is needed",

@@ -118,6 +118,12 @@ The mp3 audio from each chunk is joined together using [`pydub`](https://github.
 
 The final result is one continuous mp3 file. As far as the caller is concerned, the 10,000-character limit doesn't exist.
 
+## Timeouts
+
+Processing long text takes a while. Each chunk is its own ElevenLabs call, multi-chunk requests roughly double that up for request stitching (see [Synthesis](#1-synthesis) above), and merging the resulting audio adds more time on top. For long inputs, a single request to this service can easily run for several minutes.
+
+Most HTTP clients default to a much shorter timeout, often around 30 seconds, and will abort the request long before synthesis finishes. Whatever you're calling this service from, set its request timeout well above that default. **15 to 30 minutes** is a safe range if you expect to send long text. This service doesn't impose its own server-side timeout; the real ceiling is whatever your calling client, and any reverse proxy or platform in front of it, allow. See the [Vercel](#2-deploy) notes below for one place that ceiling matters.
+
 ## Fork & Deploy
 
 The intended way to use this project is to fork it on GitHub and deploy your own copy. You don't need anyone's permission, and you don't need to share a hosted copy with anyone else.
@@ -149,6 +155,8 @@ This works as-is on any platform that can run a Docker image (Railway, Render, F
 3. Deploy.
 
 If you change the build steps in `Dockerfile`, make the same change in `Dockerfile.vercel`. They're two separate files, not one shared file, because their `CMD` line is actually different.
+
+Watch your plan's function duration limit too. Vercel's **Hobby** plan caps a Function's execution at 5 minutes, and as explained in [Timeouts](#timeouts) above, a request with enough text to need several chunks can take longer than that, so Vercel will kill the request mid-synthesis before it ever gets a response back. Pro and Enterprise plans support a longer configurable max duration (check Vercel's current limits, since they change), which may still fall short of the 15–30 minute timeout recommended above for very large inputs. If you expect long-running requests, a non-Vercel host (see "Anywhere else" below) avoids this function-duration ceiling entirely.
 
 **Anywhere else.** Any platform that can run a Python web process will work, as long as `ffmpeg` is on `PATH`. See [Local Development](#local-development) below for running it without Docker.
 
@@ -190,7 +198,8 @@ Both of these are built straight from the real request schema, so they can't fal
 1. Build your full `text` (and optionally your own `chunk_indexes`) in a Code node.
 2. Point an HTTP Request node at your deployed instance's `/v1/text-to-speech/{voice_id}` endpoint, instead of ElevenLabs' own.
 3. Set the HTTP Request node's response format to **File / Binary**.
-4. The mp3 you get back is already fully merged, so you don't need any extra step to join files in your workflow.
+4. Under the HTTP Request node's Options, raise **Timeout** well past n8n's default. See [Timeouts](#timeouts) above; 15 to 30 minutes is a safe range for long text.
+5. The mp3 you get back is already fully merged, so you don't need any extra step to join files in your workflow.
 
 ## License
 

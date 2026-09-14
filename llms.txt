@@ -8,6 +8,10 @@
 - Synthesis: Each chunk is a separate call to `/v1/text-to-speech/{voice_id}` with the same `voice_id` and `voice_settings`. Multi-chunk requests use ElevenLabs request stitching (`previous_request_ids`/`next_request_ids`) in two passes — a forward pass, then a correction pass over every chunk except the last — costing roughly `2N-1` ElevenLabs calls for N chunks. Requires logging/history enabled on the ElevenLabs account (the default) and does not work with `eleven_v3`.
 - Merging: mp3 chunks are joined with `pydub` (via `ffmpeg`) to avoid seam glitches, with an optional `silence_between_chunks_ms` gap. Result is one continuous mp3.
 
+## Timeouts
+
+Processing long text takes several minutes (chunked synthesis, two-pass stitching, then merging). Callers must set their HTTP client's request timeout well above typical defaults (~30s) — 15 to 30 minutes is a safe range for long inputs. The service enforces no server-side timeout of its own; the ceiling is whatever the calling client and any reverse proxy/platform in front of it allow. This matters especially on Vercel: the Hobby plan caps Function execution at 5 minutes, which a multi-chunk request can exceed, causing the platform to kill the request before it responds. Pro/Enterprise plans allow a longer configurable max duration but may still fall short for very large inputs; a non-Vercel host avoids the function-duration ceiling entirely.
+
 ## API
 
 - `POST /v1/text-to-speech/{voice_id}` — main endpoint. JSON body: `text` (required), `model_id` (default `eleven_multilingual_v2`), `language_code`, `chunk_indexes` (list of `{start, end}`), `voice_settings` (`stability`, `similarity_boost`, `style`, `use_speaker_boost`, `speed`), `output_format` (default `mp3_44100_128`), `apply_text_normalization` (`auto`/`on`/`off`), `silence_between_chunks_ms` (default 300). Optional `xi-api-key` header for a caller-supplied key (takes precedence over the server default; a request with neither gets 401). Returns an `audio/mpeg` stream as an attachment.

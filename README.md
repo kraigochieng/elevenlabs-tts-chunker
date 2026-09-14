@@ -8,6 +8,24 @@ This project is meant to be **forked and run by you**: clone it, add your own El
 
 > Not affiliated with or endorsed by ElevenLabs. You'll need your own ElevenLabs account and API key, and using it means following [ElevenLabs' own Terms of Service](https://elevenlabs.io/terms-of-use).
 
+## Table of Contents
+
+- [Why](#why)
+- [Chunking Modes](#chunking-modes)
+  - [Mode 1: Automatic chunking (default)](#mode-1-automatic-chunking-default)
+  - [Mode 2: Manual chunking (`chunk_indexes`)](#mode-2-manual-chunking-chunk_indexes)
+- [How it works](#how-it-works)
+  - [1. Synthesis](#1-synthesis)
+  - [2. Merging](#2-merging)
+- [Timeouts](#timeouts)
+- [Fork & Deploy](#fork--deploy)
+  - [1. Fork and configure](#1-fork-and-configure)
+  - [2. Deploy](#2-deploy)
+- [Local Development](#local-development)
+- [API Reference](#api-reference)
+- [Usage in n8n](#usage-in-n8n)
+- [License](#license)
+
 ## Why
 
 ElevenLabs' `/v1/text-to-speech/{voice_id}` endpoint rejects any request where `text` is longer than 10,000 characters. For long content (briefs, articles, multi-part scripts), that means splitting the text into several requests yourself and joining the audio back together. You have to pick good split points, keep the voice settings the same across every call, and avoid glitches where the pieces meet.

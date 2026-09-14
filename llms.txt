@@ -5,12 +5,12 @@
 ## How it works
 
 - Chunking: If `text` fits under `DEFAULT_MAX_CHUNK_CHARS` (default 9,500), it is sent as one chunk. Otherwise it is split. Two modes: automatic (count characters, back off to the nearest space so no word is cut) or manual via `chunk_indexes` (caller supplies a list of non-overlapping `{start, end}` character ranges in `text`; gaps allowed). Manual `chunk_indexes` are ignored when the text already fits in one request.
-- Synthesis: Each chunk is a separate call to `/v1/text-to-speech/{voice_id}` with the same `voice_id` and `voice_settings`. Multi-chunk requests use ElevenLabs request stitching (`previous_request_ids`/`next_request_ids`) in two passes — a forward pass, then a correction pass over every chunk except the last — costing roughly `2N-1` ElevenLabs calls for N chunks. Requires logging/history enabled on the ElevenLabs account (the default) and does not work with `eleven_v3`.
+- Synthesis: Each chunk is a separate call to `/v1/text-to-speech/{voice_id}` with the same `voice_id` and `voice_settings`. Multi-chunk requests use ElevenLabs request stitching (`previous_request_ids`) in a single forward pass — each chunk is generated once, conditioned only on the chunks already generated before it — costing exactly `N` ElevenLabs calls for N chunks. Seams are stitched backward only (a chunk is never regenerated once its successors exist), trading some seam quality for fewer calls and less time. Requires logging/history enabled on the ElevenLabs account (the default) and does not work with `eleven_v3`.
 - Merging: mp3 chunks are joined with `pydub` (via `ffmpeg`) to avoid seam glitches, with an optional `silence_between_chunks_ms` gap. Result is one continuous mp3.
 
 ## Timeouts
 
-Processing long text takes several minutes (chunked synthesis, two-pass stitching, then merging). Callers must set their HTTP client's request timeout well above typical defaults (~30s) — 15 to 30 minutes is a safe range for long inputs. The service enforces no server-side timeout of its own; the ceiling is whatever the calling client and any reverse proxy/platform in front of it allow. This matters especially on Vercel: the Hobby plan caps Function execution at 5 minutes, which a multi-chunk request can exceed, causing the platform to kill the request before it responds. Pro/Enterprise plans allow a longer configurable max duration but may still fall short for very large inputs; a non-Vercel host avoids the function-duration ceiling entirely.
+Processing long text takes several minutes (chunked synthesis with forward-only stitching, then merging). Callers must set their HTTP client's request timeout well above typical defaults (~30s) — 15 to 30 minutes is a safe range for long inputs. The service enforces no server-side timeout of its own; the ceiling is whatever the calling client and any reverse proxy/platform in front of it allow. This matters especially on Vercel: the Hobby plan caps Function execution at 5 minutes, which a multi-chunk request can exceed, causing the platform to kill the request before it responds. Pro/Enterprise plans allow a longer configurable max duration but may still fall short for very large inputs; a non-Vercel host avoids the function-duration ceiling entirely.
 
 ## API
 
@@ -56,7 +56,7 @@ uv run uvicorn elevenlabs_tts_chunker.main:app --reload --port 8000
 - `src/elevenlabs_tts_chunker/docs.py` — plain-text API reference served at `/`.
 - `src/elevenlabs_tts_chunker/services/chunking.py` — resolves automatic vs. manual chunk boundaries.
 - `src/elevenlabs_tts_chunker/services/tts.py` — ElevenLabs client and per-chunk synthesis.
-- `src/elevenlabs_tts_chunker/services/orchestrator.py` — the chunk → synthesize (two-pass stitching) → merge pipeline.
+- `src/elevenlabs_tts_chunker/services/orchestrator.py` — the chunk → synthesize (single forward-stitched pass) → merge pipeline.
 - `src/elevenlabs_tts_chunker/services/audio.py` — mp3 merging with `pydub`/`ffmpeg`.
 
 ## Usage in n8n

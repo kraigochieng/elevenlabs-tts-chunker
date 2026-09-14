@@ -95,17 +95,18 @@ CHUNK SEAM CONTINUITY
 ----------------------
 
 Multi-chunk requests use ElevenLabs' request stitching
-(previous_request_ids/next_request_ids) so each chunk is conditioned on the
-actual audio generated for its neighbors, not just surrounding text. This
-runs as two synthesis passes per request (a forward pass, then a correction
-pass covering every chunk but the last) — so a request that resolves to N
-chunks costs roughly 2N-1 ElevenLabs API calls, not N. Single-chunk requests
-are unaffected (1 call, no second pass).
+(previous_request_ids) so each chunk is conditioned on the actual audio
+already generated for the chunks before it, not just surrounding text.
+This is a single forward pass — each chunk is generated once, in order —
+so a request that resolves to N chunks costs exactly N ElevenLabs API
+calls. Seams are only stitched backward: a chunk is never regenerated once
+its successors exist, trading some seam quality for half the calls (and
+time) a bidirectional correction pass would cost.
 
 Requires logging/history enabled on the ElevenLabs account (the default;
 disabled only for Zero Retention Mode accounts) and is unavailable on the
-eleven_v3 model. Up to {MAX_STITCHING_REQUEST_IDS} request_ids are sent
-per direction.
+eleven_v3 model. Up to {MAX_STITCHING_REQUEST_IDS} previous request_ids are
+sent per chunk.
 
 
 OTHER ENDPOINTS

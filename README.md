@@ -110,7 +110,7 @@ Each row in the table above is one entry in `chunk_indexes`. That's the whole id
 
 Each chunk, from whichever chunking mode was used, is sent to ElevenLabs as its own call to `/v1/text-to-speech/{voice_id}`. Every chunk uses the same `voice_id` and `voice_settings`, so the voice stays consistent across the merged output.
 
-For requests with more than one chunk, the seams also use ElevenLabs' **request stitching** (`previous_request_ids`/`next_request_ids`). This lets each chunk build on the real audio already generated for its neighbors. It runs in two passes: a forward pass, then a correction pass that covers every chunk except the last. So a request with N chunks costs roughly `2N-1` ElevenLabs API calls, not `N`. This needs logging/history turned on for your ElevenLabs account, which is the default, and it doesn't work with the `eleven_v3` model.
+For requests with more than one chunk, the seams also use ElevenLabs' **request stitching** (`previous_request_ids`). This lets each chunk build on the real audio already generated for the chunks before it. It's a single forward pass: each chunk is generated once, in order, so a request with N chunks costs exactly `N` ElevenLabs API calls. Seams are only stitched backward, not forward, since a chunk is never regenerated once its successors exist — that's a deliberate trade-off of some seam quality for speed and cost. This needs logging/history turned on for your ElevenLabs account, which is the default, and it doesn't work with the `eleven_v3` model.
 
 ### 2. Merging
 
@@ -120,7 +120,7 @@ The final result is one continuous mp3 file. As far as the caller is concerned, 
 
 ## Timeouts
 
-Processing long text takes a while. Each chunk is its own ElevenLabs call, multi-chunk requests roughly double that up for request stitching (see [Synthesis](#1-synthesis) above), and merging the resulting audio adds more time on top. For long inputs, a single request to this service can easily run for several minutes.
+Processing long text takes a while. Each chunk is its own ElevenLabs call (see [Synthesis](#1-synthesis) above), and merging the resulting audio adds more time on top. For long inputs, a single request to this service can easily run for several minutes.
 
 Most HTTP clients default to a much shorter timeout, often around 30 seconds, and will abort the request long before synthesis finishes. Whatever you're calling this service from, set its request timeout well above that default. **15 to 30 minutes** is a safe range if you expect to send long text. This service doesn't impose its own server-side timeout; the real ceiling is whatever your calling client, and any reverse proxy or platform in front of it, allow. See the [Vercel](#2-deploy) notes below for one place that ceiling matters.
 

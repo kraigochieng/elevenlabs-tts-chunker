@@ -14,8 +14,7 @@ from pydantic import SecretStr
 from elevenlabs_tts_chunker.logging_config import logger
 from elevenlabs_tts_chunker.settings import get_settings
 
-# ElevenLabs allows at most 3 previous_request_ids / next_request_ids per
-# request stitching call.
+# ElevenLabs allows at most 3 previous_request_ids per request stitching call.
 MAX_STITCHING_REQUEST_IDS = 3
 
 
@@ -40,10 +39,10 @@ def get_elevenlabs_client(api_key: SecretStr | None = None) -> AsyncElevenLabs:
 @dataclass
 class SynthesizedChunk:
     """Audio for one chunk, plus the request_id ElevenLabs assigned to it so
-    it can be used as previous_request_ids/next_request_ids on neighboring
-    chunks' requests (request stitching). request_id is None if the
-    response didn't carry one (e.g. logging/history disabled on the
-    account), in which case stitching against this chunk is skipped."""
+    it can be used as previous_request_ids on later chunks' requests
+    (request stitching). request_id is None if the response didn't carry
+    one (e.g. logging/history disabled on the account), in which case
+    stitching against this chunk is skipped."""
 
     audio_bytes: bytes
     request_id: str | None
@@ -60,27 +59,23 @@ async def synthesize_chunk(
     chunk_number: int,
     total_chunks: int,
     previous_request_ids: list[str] | None = None,
-    next_request_ids: list[str] | None = None,
-    pass_label: str = "synthesis",
 ) -> SynthesizedChunk:
     """Calls the ElevenLabs SDK for a single chunk of text and collects the
     streamed audio bytes plus the request_id ElevenLabs assigned to the
     generation."""
     logger.info(
-        "Synthesizing chunk %d/%d (%d chars) via voice_id=%s model_id=%s [%s]",
+        "Synthesizing chunk %d/%d (%d chars) via voice_id=%s model_id=%s",
         chunk_number,
         total_chunks,
         len(text),
         voice_id,
         model_id,
-        pass_label,
     )
     logger.debug(
-        "Chunk %d/%d context | previous_request_ids=%s next_request_ids=%s",
+        "Chunk %d/%d context | previous_request_ids=%s",
         chunk_number,
         total_chunks,
         previous_request_ids,
-        next_request_ids,
     )
     start_time = time.perf_counter()
 
@@ -95,7 +90,6 @@ async def synthesize_chunk(
             output_format=output_format,
             apply_text_normalization=apply_text_normalization,
             previous_request_ids=previous_request_ids,
-            next_request_ids=next_request_ids,
         ) as response:
             audio_bytes = b"".join([chunk async for chunk in response.data])
             request_id = response.headers.get("request-id")

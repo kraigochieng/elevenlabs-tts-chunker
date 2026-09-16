@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: elevenlabs-tts-chunker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: DEFAULT_MAX_CHUNK_CHARS
+        value: "9500"
+      - key: LOG_LEVEL
+        value: INFO

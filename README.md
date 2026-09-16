@@ -166,6 +166,12 @@ docker run -p 8000:8000 -e ELEVENLABS_API_KEY=your_api_key_here elevenlabs-tts-c
 
 This works as-is on any platform that can run a Docker image (Railway, Render, Fly.io, a plain VM, and so on). Just set your environment variables the usual way for that platform.
 
+**Render.** The repo includes a [`render.yaml`](render.yaml) blueprint that builds the plain [`Dockerfile`](Dockerfile) on Render's free plan:
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/kraigochieng/elevenlabs-tts-chunker)
+
+Click the button (after forking, point it at your own fork so you're deploying your copy, not this one), or from the Render dashboard use **New → Blueprint** and select your forked repo. Render will ask for `ELEVENLABS_API_KEY` during setup — leave it blank if you want every caller to bring their own key instead. No function-duration ceiling to worry about here, unlike the Vercel path below.
+
 **Vercel.** Use the Docker path, via [`Dockerfile.vercel`](Dockerfile.vercel). Vercel's own Python runtime doesn't include `ffmpeg`, which multi-chunk requests need for merging audio, so that runtime won't work for this project. `Dockerfile.vercel` is a Vercel-specific version of [`Dockerfile`](Dockerfile). It's a separate file because Vercel Functions have to listen on the port given in `$PORT`, not a fixed one. If Vercel finds a `Dockerfile.vercel` at the root of your repo, it builds that into a container-backed Function instead of using its native runtime. That way, `ffmpeg` is available, just like in the plain Docker image.
 
 1. Import the forked repo at [vercel.com/new](https://vercel.com/new) (or run `vercel` from the repo root).
